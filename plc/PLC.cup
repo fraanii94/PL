@@ -1,0 +1,69 @@
+import java_cup.runtime.*;
+
+/*Terminals */
+terminal				MAS, MENOS, POR, DIV, MENOSUNARIO;
+terminal				AP, CP, ALL, CLL;
+terminal				ASIG, PYC;
+terminal				EQ, NEQ, MEN, MEOI, MAY, MAOI, NOT, AND, OR;
+terminal				PRINT;
+terminal String			IF, WHILE, DO, FOR,ELSE;
+terminal String		ENTERO;
+terminal String			IDENT;
+
+/* Non terminals */
+non terminal			listaSent;
+non terminal 		sentencia;
+non terminal String		expresion;
+non terminal Generator.Label 		condicion;
+non terminal 			bloqueElse;
+/* Precedence */
+
+
+precedence left         MAS, MENOS;
+precedence left         POR, DIV;
+precedence left        MENOSUNARIO;
+precedence left  AND, OR;
+precedence left  ELSE;
+precedence right NOT;
+//Gramática
+
+listaSent ::= sentencia
+	  | listaSent sentencia
+	  ;
+sentencia ::= IF:iflabel AP condicion:c CP {:Generator.label(c.getTLabel()); :}  sentencia {: Generator.gotos(iflabel); Generator.label(c.getFLabel()); :}
+	      bloqueElse {:Generator.label(iflabel);:}
+	  | expresion:e1 PYC {:  :}
+	  | PRINT AP expresion:e CP PYC {: Generator.print(e); :}
+	  | ALL listaSent CLL {: :}
+	  | FOR:iflabel AP IDENT:id ASIG expresion:e1 {: Generator.asig(id,e1); Generator.label(iflabel);:} PYC condicion:c {: Generator.label(Generator.getLabel()); :} PYC IDENT:idd ASIG expresion:e2 {:Generator.asig(idd,e2);Generator.gotos(iflabel);String label = "Label" + (1+Integer.parseInt(""+iflabel.charAt(5)));Generator.label(label);:} CP sentencia {: String label = "Label" + (3+Integer.parseInt(""+iflabel.charAt(5)));Generator.gotos(label); label = "Label" + (2+Integer.parseInt(""+iflabel.charAt(5)));Generator.label(label); :}
+
+	  | WHILE:iflabel {: Generator.label(iflabel); :} AP condicion:c  {: Generator.label(c.getTLabel()); :} CP sentencia {: Generator.gotos(iflabel); String label = "Label" + (2+Integer.parseInt(""+iflabel.charAt(5)));Generator.label(label);:}
+
+	  | DO:iflabel {: Generator.label(iflabel); :} sentencia WHILE condicion:c {: Generator.label(c.getTLabel()); Generator.gotos(iflabel);Generator.label(c.getFLabel()); :} PYC
+	  ;
+expresion ::= expresion:e1 MAS expresion:e2 {: RESULT = Generator.arithmetic(e1 + "+" + e2); :}
+	  | expresion:e1 MENOS expresion:e2 {: RESULT = Generator.arithmetic(e1 + "-" + e2); :}
+	  | expresion:e1 POR expresion:e2 {: RESULT = Generator.arithmetic(e1 + "*" + e2); :}
+	  | expresion:e1 DIV expresion:e2 {: RESULT = Generator.arithmetic(e1 + "/" + e2); :}
+	  | MENOS expresion:e1 {: RESULT = Generator.arithmetic("-" + e1); :} %prec MENOSUNARIO 
+	  | AP expresion:e1 CP {: RESULT = e1; :}
+	  | IDENT:id ASIG expresion:e1 {: RESULT = Generator.asig(id,e1); :}
+	  | IDENT:id {: RESULT = id.toString(); :}
+	  | ENTERO:n {: RESULT = n.toString(); :}
+	  ;
+condicion ::= expresion:e1 EQ expresion:e2 {: RESULT = Generator.condicion(Generator.EQ,e1,e2); :}
+	  | expresion:e1 NEQ expresion:e2 {: RESULT = Generator.condicion(Generator.NEQ,e1,e2); :}
+	  | expresion:e1 MEN expresion:e2 {: RESULT = Generator.condicion(Generator.MEN,e1,e2); :}
+	  | expresion:e1 MEOI expresion:e2 {: RESULT =  Generator.condicion(Generator.MEOI,e1,e2); :}
+	  | expresion:e1 MAY expresion:e2 {:RESULT =  Generator.condicion(Generator.MAY,e1,e2); :}
+	  | expresion:e1 MAOI expresion:e2 {:RESULT =  Generator.condicion(Generator.MAOI,e1,e2); :}
+      	  | AP condicion:c CP {: RESULT = c; :}
+	  | NOT condicion:c {: String aux = c.getTLabel();c.setTLabel(c.getFLabel());c.setFLabel(aux);RESULT = c;:}
+	  | condicion:c1 AND					{: Generator.label(c1.getTLabel()); :}
+		  condicion:c2						{: RESULT = c2; Generator.label(c1.getFLabel()); Generator.gotos(c2.getTLabel()); :}
+	  | condicion:c1 OR					{: Generator.label(c1.getFLabel()); :}
+		  condicion:c2 {: RESULT = c2; Generator.label(c1.getTLabel()); Generator.gotos(c2.getFLabel()); :}
+	  ;
+bloqueElse ::= ELSE sentencia
+	  | 
+	  ;
